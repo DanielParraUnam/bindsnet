@@ -1,4 +1,5 @@
 from bindsnet.network.nodes import Nodes
+import torch
 
 class Burst(Nodes):
     
@@ -141,32 +142,34 @@ class Burst(Nodes):
 
 
 def main():
-	BurstLayer = Burst(
-            n=n_neurons,
-            traces=True,
-            rest=15.0,
-            restvs=30.0,
-            restvu=20.0,
-            reset=15.0,
-            thresh=80.0,
-            tc_decay=10.0,
-            refrac=0,
-            tc_trace=20.0,
+    import matplotlib.pyplot as plt
+    n_neurons=100
+    BurstLayer = Burst(
+        n=n_neurons,
+        traces=True,
+        rest=15.0,
+        restvs=30.0,
+        restvu=20.0,
+        reset=15.0,
+        thresh=80.0,
+        tc_decay=10.0,
+        refrac=0,
+        tc_trace=20.0
         )
-	BurstLayer.set_batch_size(1)
-	BurstLayer.compute_decays(0.1)
+    BurstLayer.set_batch_size(1)
+    BurstLayer.compute_decays(0.1)
 
-	Burstvoltages = []
-	Burstspikes = []
-	for t in range(250):
-	    BurstLayer.forward(torch.zeros((1,n_neurons)))#torch.randint(0, 2, (1,n_neurons))) torch.ones((1,n_neurons))
-	    Burstvoltages.append(BurstLayer.v)
-	    Burstspikes.append(BurstLayer.s)
+    Burstvoltages = []
+    Burstspikes = []
+    for t in range(250):
+        BurstLayer.forward(torch.zeros((1,n_neurons)))#torch.randint(0, 2, (1,n_neurons))) torch.ones((1,n_neurons))
+        Burstvoltages.append(BurstLayer.v)
+        Burstspikes.append(BurstLayer.s)
 
-	plt.plot(torch.cat(Burstvoltages, dim=0)[:,torch.randperm(n_neurons)[25:30]])
-	plt.show()
+    plt.plot(torch.cat(Burstvoltages, dim=0)[:,torch.randperm(n_neurons)[25:30]])
+    plt.show()
 
-	plt.matshow(torch.cat(Burstspikes,dim=0).transpose(0,1))
+    plt.matshow(torch.cat(Burstspikes,dim=0).transpose(0,1))
 
 if __name__ == '__main__':
-    main()        
+    main() 

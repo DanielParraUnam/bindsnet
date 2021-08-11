@@ -1,5 +1,26 @@
-from bindsnet.network.network import Network
-import burst
+import os
+import torch
+from torchvision import transforms
+from tqdm import tqdm
+from time import time as t
+
+# TODO Replace LIFNodes with burst nodes and tune to get sane responses
+from bindsnet.network import Network
+from bindsnet.network.nodes import Input, LIFNodes 
+from bindsnet.network.topology import Connection
+from bindsnet.learning import PostPre
+from bindsnet.datasets import MNIST
+from bindsnet.encoding import PoissonEncoder
+from bindsnet.network.monitors import Monitor
+from bindsnet.utils import get_square_weights, get_square_assignments
+from bindsnet.analysis.plotting import (
+    plot_input,
+    plot_spikes,
+    plot_weights,
+    plot_voltages,
+)
+
+from burst import Burst
 
 class DiehlAndCookBursting(Network):
     """
@@ -59,7 +80,7 @@ class DiehlAndCookBursting(Network):
         input_layer = Input(
             n=self.n_inpt, shape=self.inpt_shape, traces=True, tc_trace=20.0
         )
-        exc_layer = burst.Burst(
+        exc_layer = Burst(
             n=self.n_neurons,
             traces=True,
             rest=15.0,
@@ -138,6 +159,8 @@ class BurstingFC(Network):
         tc_theta_decay: float = 1e7,
         inpt_shape = None,
     ) -> None:
+        # TODO Write function
+        print("TODO")
 
 class BurstingConv(Network):
     """
@@ -161,19 +184,21 @@ class BurstingConv(Network):
         tc_theta_decay: float = 1e7,
         inpt_shape = None,
     ) -> None:
-
+        # TODO Write function
+        print("TODO")
 
 def main():
-    dt=0.1
-    time=50
+    dt = 0.1
+    time = 50
+    n_neurons = 100
+    intensity = 128
     network = DiehlAndCookBursting(
         n_inpt=784,
         n_neurons=n_neurons,
-        exc=exc,
-        inh=inh,
+        exc=22.5,
+        inh=17.5,
         dt=0.1,
         norm=78.4,
-        theta_plus=theta_plus,
         inpt_shape=(1, 28, 28),
     )
 
@@ -190,20 +215,20 @@ def main():
     )
 
     # Record spikes during the simulation.
-    spike_record = torch.zeros((1, int(time / dt), n_neurons), device=device)
+    spike_record = torch.zeros((1, int(time / dt), n_neurons))
 
     # Neuron assignments and spike proportions.
     n_classes = 10
-    assignments = -torch.ones(n_neurons, device=device)
-    proportions = torch.zeros((n_neurons, n_classes), device=device)
-    rates = torch.zeros((n_neurons, n_classes), device=device)
+    assignments = -torch.ones(n_neurons)
+    proportions = torch.zeros((n_neurons, n_classes))
+    rates = torch.zeros((n_neurons, n_classes))
 
     # Voltage recording for excitatory and inhibitory layers.
     exc_voltage_monitor = Monitor(
-        network.layers["Ae"], ["v"], time=int(time / dt), device=device
+        network.layers["Ae"], ["v"], time=int(time / dt)
     )
     inh_voltage_monitor = Monitor(
-        network.layers["Ai"], ["v"], time=int(time / dt), device=device
+        network.layers["Ai"], ["v"], time=int(time / dt)
     )
     network.add_monitor(exc_voltage_monitor, name="exc_voltage")
     network.add_monitor(inh_voltage_monitor, name="inh_voltage")
@@ -212,28 +237,24 @@ def main():
     spikes = {}
     for layer in set(network.layers):
         spikes[layer] = Monitor(
-            network.layers[layer], state_vars=["s"], time=int(time / dt), device=device
+            network.layers[layer], state_vars=["s"], time=int(time / dt)
         )
         network.add_monitor(spikes[layer], name="%s_spikes" % layer)
 
     voltages = {}
     for layer in set(network.layers) - {"X"}:
         voltages[layer] = Monitor(
-            network.layers[layer], state_vars=["v"], time=int(time / dt), device=device
+            network.layers[layer], state_vars=["v"], time=int(time / dt)
         )
         
     # Create a dataloader to iterate and batch data
-    dataloader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=1, shuffle=True, num_workers=n_workers, pin_memory=gpu
-    )
+    dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True)
 
-    #network.train(mode=False)
+    network.train(mode=False)
 
     # Get next input sample.
     single_image = next(iter(dataloader))
     inputs = {"X": single_image["encoded_image"].view(int(time / dt), 1, 1, 28, 28)}
-    if gpu:
-        inputs = {k: v.cuda() for k, v in inputs.items()}
         
     # Run the network on the input.
     network.run(inputs=inputs, time=int(time), input_time_dim=1)
@@ -251,8 +272,8 @@ def main():
     perf_ax = None
     voltage_axes, voltage_ims = None, None
 
-
     # Optionally plot various simulation information.
+    n_sqrt = int(n_neurons**(0.5))
     image = single_image["image"].view(28, 28)
     inpt = inputs["X"].view(int(time/dt), 784).sum(0).view(28, 28)
     input_exc_weights = network.connections[("X", "Ae")].w
